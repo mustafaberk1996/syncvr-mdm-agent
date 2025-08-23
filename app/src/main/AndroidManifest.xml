@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_DOWNLOAD_MANAGER" />
+
+    <!-- Using ProtectedPermission to make lint shut up about this. We're DeviceOwner so it's ok.-->
+    <!-- https://source.android.com/devices/tech/config/device-identifiers -->
+    <uses-permission
+        android:name="android.permission.READ_PRIVILEGED_PHONE_STATE"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission
+        android:name="android.permission.READ_LOGS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission
+        android:name="android.permission.WRITE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission
+        android:name="android.permission.DELETE_PACKAGES"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission
+        android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+
+
+    <permission-group android:name="tech.syncvr.PLATFORM_SDK" />
+
+    <permission
+        android:name="tech.syncvr.permission.PLATFORM_SDK"
+        android:label="@string/permlabel_bind_platform_sdk"
+        android:description="@string/permlabel_bind_platform_sdk"
+        android:permissionGroup="tech.syncvr.PLATFORM_SDK"
+        android:protectionLevel="normal" />
+
+    <application
+        android:name=".MDMAgentApplication"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:requestLegacyExternalStorage="true"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.SyncVRMDMAgent">
+
+        <activity
+            android:name=".activities.GrantAllFilesAccessActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask">
+        </activity>
+
+        <!-- If you want to disable android.startup completely. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            tools:node="remove" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="tech.syncvr.mdm_agent.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <receiver
+            android:name=".receivers.BootCompletedReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <!-- Cant really know what priority i'm competing against. Let's just go above 9000 -->
+            <!-- Significantly improves startup time, since we sometimes had to wait a full minute
+            after boot to have the agent running -->
+            <intent-filter android:priority="9001">
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".receivers.StartOnceReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="tech.syncvr.intent.START_ONCE" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".receivers.DeviceOwnerReceiver"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_owner_receiver" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".receivers.DownloadCompleteReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".receivers.PackageReplacedReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".receivers.SetAutoStartReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="tech.syncvr.intent.GET_AUTO_START" />
+                <action android:name="tech.syncvr.intent.SET_AUTO_START" />
+                <action android:name="tech.syncvr.intent.CLEAR_AUTO_START" />
+                <action android:name="tech.syncvr.intent.AUTO_START_ON" />
+                <action android:name="tech.syncvr.intent.AUTO_START_OFF" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".receivers.OculusActionReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="tech.syncvr.intent.OCULUS_ACTION_CALLED" />
+            </intent-filter>
+        </receiver>
+        <!--
+            TODO: Not sure if we want to keep this receiver around in the end... It is convenient
+            to test the play area repository, and to be able to configure it without Pico Gallery
+            present. Eventually this would need to be done through Gallery or Dashboard though.
+        -->
+        <receiver
+            android:name=".receivers.PlayAreaConfigReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="tech.syncvr.intent.AUTO_CONFIG_PLAY_AREA_SITTING" />
+                <action android:name="tech.syncvr.intent.AUTO_CONFIG_PLAY_AREA_STANDING" />
+                <action android:name="tech.syncvr.intent.AUTO_CONFIG_PLAY_AREA_OFF" />
+            </intent-filter>
+        </receiver>
+        <activity
+            android:name=".activities.TabletGalleryActivity"
+            android:clearTaskOnLaunch="true"
+            android:enabled="false"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:lockTaskMode="if_whitelisted">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <!--                <category android:name="android.intent.category.LAUNCHER" />-->
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".MDMAgentForegroundService"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.pvr.tobservice.SERVICE_AUTO_BOOT" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".logging.LoggingAppInterface"
+            android:enabled="true"
+            android:exported="true" />
+        <service
+            android:name=".device_identity.DeviceIdentityAppInterface"
+            android:enabled="true"
+            android:exported="true" />
+        <service
+            android:name=".repositories.play_area.PlayAreaConfigAppInterface"
+            android:enabled="true"
+            android:exported="true" />
+        <service
+            android:name=".device_management.services.WifiConfigService"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="tech.syncvr.intent.ADD_WIFI_NETWORK" />
+                <action android:name="tech.syncvr.intent.REMOVE_WIFI_NETWORK" />
+                <action android:name="tech.syncvr.intent.STOP_HOTSPOT" />
+                <action android:name="tech.syncvr.intent.START_HOTSPOT" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".provisioning.ProvisioningService"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="tech.syncvr.intent.START_PROVISIONING" />
+                <action android:name="tech.syncvr.intent.STOP_PROVISIONING" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".platform_sdk.SyncVRPlatformService"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="tech.syncvr.intent.BIND_PLATFORM_SERVICE" />
+            </intent-filter>
+        </service>
+    </application>
+
+</manifest>

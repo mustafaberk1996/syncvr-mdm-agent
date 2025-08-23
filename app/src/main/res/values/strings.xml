@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">SyncVR MDM Agent</string>
+    <string name="permlabel_bind_platform_sdk">Allow usage of SyncVR Platform SDK</string>
+
+
+    <string name="permission_title_pos">No Extra permission required</string>
+    <string name="permission_title_neg">Permissions needed</string>
+    <string name="permission_description_pos">All required permissions are granted</string>
+    <string name="permission_description_neg">To use the app, enable all listed permissions in your device settings.</string>
+    <string name="permission_button_settings">Go to settings</string>
+
+</resources>

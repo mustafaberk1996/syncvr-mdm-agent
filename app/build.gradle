@@ -1,0 +1,189 @@
+plugins {
+    id 'com.android.application'
+    id 'kotlin-android'
+    id 'org.jetbrains.kotlin.plugin.serialization' version "$kotlin_version"
+    id 'com.gladed.androidgitversion' version '0.4.14'
+//    id 'com.google.devtools.ksp' version '2.0.0-1.0.22'
+}
+
+apply plugin: 'com.google.gms.google-services'  // Google Services plugin
+apply plugin: 'com.google.firebase.crashlytics'
+apply plugin: 'dagger.hilt.android.plugin'
+apply plugin: 'com.google.devtools.ksp'
+apply plugin: 'kotlinx-serialization'
+
+// https://github.com/gladed/gradle-android-git-version
+androidGitVersion {
+    prefix 'V'
+    codeFormat = 'MNNPP'
+    untrackedIsDirty = false
+}
+
+android {
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "tech.syncvr.mdm_agent"
+        minSdkVersion 27
+        //noinspection ExpiredTargetSdkVersion
+        targetSdkVersion 31
+        versionCode androidGitVersion.code()
+        versionName androidGitVersion.name()
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildFeatures {
+        viewBinding true
+    }
+
+    signingConfigs {
+        release {
+            storeFile file('../mdm_agent_keystore.jks')
+            storePassword findProperty('mdm_store_passwd')
+            keyAlias findProperty('mdm_key_alias')
+            keyPassword findProperty('mdm_key_passwd')
+        }
+    }
+
+    applicationVariants.all { variant ->
+        variant.outputs.each { output ->
+            output.outputFileName = defaultConfig.versionName + ".mdm-agent." + variant.buildType.name + ".apk"
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            debuggable false
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            buildConfigField("boolean", "ADB_CONFIG_REMOTE_SOURCE", "false")
+            buildConfigField("String", "SYNCVR_API_BASE_URL", "\"https://europe-west1-optimum-time-233909.cloudfunctions.net/\"")
+            buildConfigField("String", "SYNCVR_DEVICE_API_BASE_URL", "\"https://device-api-xv7hjdv2oq-ey.a.run.app\"")
+        }
+        debug {
+            debuggable true
+            minifyEnabled true
+            shrinkResources true
+            buildConfigField("boolean", "ADB_CONFIG_REMOTE_SOURCE", "false")
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            buildConfigField("String", "SYNCVR_API_BASE_URL", "\"https://europe-west1-optimum-time-233909.cloudfunctions.net/\"")
+            buildConfigField("String", "SYNCVR_DEVICE_API_BASE_URL", "\"https://device-api-xv7hjdv2oq-ey.a.run.app\"")
+        }
+        staging {
+            initWith(getByName("debug"))
+            // staging is now the only variant actually wired to staging platform
+            buildConfigField("String", "SYNCVR_API_BASE_URL", "\"https://europe-west1-syncvr-dev.cloudfunctions.net/\"")
+            buildConfigField("String", "SYNCVR_DEVICE_API_BASE_URL", "\"https://device-api-zmhqzq2vea-ey.a.run.app\"")
+        }
+        stagingRelease {
+            initWith(getByName("release"))
+            debuggable true
+            // staging is now the only variant actually wired to staging platform
+            buildConfigField("String", "SYNCVR_API_BASE_URL", "\"https://europe-west1-syncvr-dev.cloudfunctions.net/\"")
+            buildConfigField("String", "SYNCVR_DEVICE_API_BASE_URL", "\"https://device-api-zmhqzq2vea-ey.a.run.app/\"")
+        }
+        mock {
+            initWith(getByName("debug"))
+            // buildvariant to be used icm with a postman mockserver, change with your own mockserver (you have 1000 free calls a month to it)
+            buildConfigField("String", "SYNCVR_API_BASE_URL", "\"https://cfc693f2-37ce-4c0b-ad4c-8776c7338156.mock.pstmn.io/\"")
+        }
+        profiler {
+            initWith(getByName("debug"))
+            // this could be debuggable but profiler states it could throw some timing off
+            debuggable false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+
+    namespace 'tech.syncvr.mdm_agent'
+}
+
+dependencies {
+
+    implementation("io.github.z4kn4fein:semver:1.4.2")
+    implementation 'com.picoxr.tobservice:tobservicelib:4.3.10'
+
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'com.google.android.material:material:1.12.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.work:work-runtime:2.9.1'
+    implementation project(path: ':mdm-common')
+    implementation 'androidx.legacy:legacy-support-v4:1.0.0'
+    implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.8.5'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.5'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.5'
+    implementation 'androidx.fragment:fragment-ktx:1.8.3'
+
+    implementation project(path: ':platform-sdk')
+    implementation project(path: ':logging-connector-v2')
+
+    implementation 'androidx.lifecycle:lifecycle-service:2.8.5'
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation "io.mockk:mockk:1.13.3"
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
+
+    // Import the Firebase BoM
+    implementation platform('com.google.firebase:firebase-bom:33.3.0')
+    implementation 'com.google.firebase:firebase-crashlytics-ktx'
+    implementation 'com.google.firebase:firebase-analytics-ktx'
+    implementation 'com.google.firebase:firebase-auth-ktx'
+    implementation 'com.google.firebase:firebase-firestore-ktx'
+
+    // API Interaction
+    implementation 'com.android.volley:volley:1.2.1'
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.9.3'
+
+    // Coroutines
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3'
+    /* coroutines support for firebase operations */
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3'
+
+    // Groupie
+    implementation "com.github.lisawray.groupie:groupie:$groupie_version"
+    implementation "com.github.lisawray.groupie:groupie-viewbinding:$groupie_version"
+
+    // Dependency injection
+    implementation 'com.google.dagger:hilt-android:2.49'
+    ksp 'com.google.dagger:hilt-compiler:2.49'
+    implementation 'androidx.hilt:hilt-common:1.2.0'
+    implementation 'androidx.hilt:hilt-work:1.2.0'
+    ksp 'androidx.hilt:hilt-compiler:1.2.0'
+
+
+    // CanaryLeak - Memory Leak detection
+    // debug variant hook
+    debugImplementation 'com.squareup.leakcanary:leakcanary-android:2.9.1'
+    // staging variant hook
+    stagingImplementation 'com.squareup.leakcanary:leakcanary-android:2.9.1'
+    // profiler variant hook
+    profilerImplementation 'com.squareup.leakcanary:leakcanary-android:2.9.1'
+
+    implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2"
+    implementation("com.jakewharton.retrofit:retrofit2-kotlinx-serialization-converter:1.0.0")
+    implementation "org.jetbrains.kotlin:kotlin-reflect:2.0.0"
+    implementation("org.nanohttpd:nanohttpd:2.3.1")
+
+    implementation("org.jetbrains.kotlin:kotlin-reflect:${kotlin_version}")
+    implementation "androidx.security:security-crypto:1.0.0"
+
+    // room
+    implementation "androidx.room:room-runtime:$room_version"
+    ksp "androidx.room:room-compiler:$room_version"
+
+    implementation "androidx.room:room-ktx:$room_version"
+}

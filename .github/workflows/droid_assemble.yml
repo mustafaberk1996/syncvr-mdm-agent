@@ -1,0 +1,64 @@
+name: Assemble everything - test builds
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - test-*
+
+# https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-Readme.md
+jobs:
+  draft-release:
+    name: "Build all variants"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+
+      - name: Secret setup
+        env:
+          GOOG_CREDS_DEV: "${{secrets.GOOG_CREDS_DEV}}"
+          GOOG_CREDS_PROD: "${{secrets.GOOG_CREDS_PROD}}"
+          GRADLE_PROPS: "${{secrets.GRADLE_PROPS}}"
+        run: ./config/github_secrets.sh
+
+      - name: Firebase config
+        uses: gradle/gradle-build-action@v2
+        with:
+          arguments: --no-daemon --build-cache firebase
+
+      - name: Build all releases
+        uses: gradle/gradle-build-action@v2
+        with:
+          arguments: --parallel --no-daemon clean assemble
+
+      - name: Changelog
+        run: ./config/gen_changelog.sh
+
+      - name: Set current date as env variable
+        run: echo "NOW=$(date +%Y-%m-%dT%H%M%S)" >> $GITHUB_ENV
+
+      - name: Extract branch name
+        shell: bash
+        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+        id: extract_branch
+
+      - name: Extract tag name
+        shell: bash
+        run: echo "##[set-output name=tag;]$(echo ${GITHUB_REF#refs/tags/})"
+        id: extract_tag
+
+      - name: Artifact from branch
+        uses: actions/upload-artifact@v3
+        if: startsWith(github.ref, 'refs/heads/')
+        with:
+          name: All build variants ${{ steps.extract_branch.outputs.branch }} ${{env.NOW}}
+          path: |
+            **/*.apk
+            **/*.aar
+            **/release/mapping.txt
+            **/debug/mapping.txt
+            **/staging/mapping.txt
+            **/profiler/mapping.txt
+          retention-days: 90

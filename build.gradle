@@ -1,0 +1,60 @@
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+buildscript {
+    ext.kotlin_version = "2.0.0"
+
+    ext.room_version = '2.6.1'
+
+    ext.groupie_version = '2.10.1'
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.5.2'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath 'com.google.gms:google-services:4.4.2'  // Google Services plugin
+
+        // Add the Crashlytics Gradle plugin (be sure to add version
+        // 2.0.0 or later if you built your app with Android Studio 4.1).
+        classpath 'com.google.firebase:firebase-crashlytics-gradle:3.0.2'
+
+        classpath 'com.google.dagger:hilt-android-gradle-plugin:2.49'
+
+        classpath 'com.google.devtools.ksp:com.google.devtools.ksp.gradle.plugin:2.0.0-1.0.22'
+
+        // NOTE: Do not place your application dependencies here; they belong
+        // in the individual module build.gradle files
+    }
+    if (gradle.startParameter.taskNames.contains("firebase")) {
+        // auto firebase config
+        // apply from: means its a gradle plugin in script form
+        // gradle plugin get their own jvm/classpath
+        // which is excellent since firebase sdk conflicts with android build tools (guava conflict)
+        apply from: "$project.rootDir/config/firebase.gradle"
+    }
+    apply from: "$project.rootDir/config/defaults.gradle"
+}
+
+// I wasn't able to find a better hook than this
+gradle.projectsEvaluated {
+    subprojects {
+        preBuild.dependsOn debugConfig
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url "https://jitpack.io" }
+        maven {
+            url 'https://artifacts-cn-beijing.volces.com/repository/picoxrtob'
+        }
+    }
+}
+
+task clean(type: Delete) {
+    getProject().getRootProject().getSubprojects().forEach { delete it.getPath() + "/build/" }
+    delete rootProject.buildDir
+}

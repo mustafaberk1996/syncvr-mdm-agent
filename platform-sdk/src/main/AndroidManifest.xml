@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="tech.syncvr.permission.PLATFORM_SDK" />
+
+    <queries>
+        <package android:name="tech.syncvr.mdm_agent" />
+    </queries>
+</manifest>

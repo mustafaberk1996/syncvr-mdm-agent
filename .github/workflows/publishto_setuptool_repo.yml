@@ -1,0 +1,64 @@
+name: Publish to SetupTool repo
+
+permissions:
+  contents: write
+  id-token: write
+
+on:
+  workflow_dispatch:
+
+# https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-Readme.md
+jobs:
+  publish-setuptool-repo:
+    name: "Publishing to SetupTool repo"
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: "Check if tag"
+        uses: actions/github-script@v6
+        if: ${{ github.ref_type == 'branch' }}
+        with:
+          script: core.setFailed('Run this workflow on a tag')
+
+      # Need to checkout as a pre-requisite for 'gh release' cmd
+      - name: Checkout
+        uses: actions/checkout@v1
+
+      - name: "Download apks from this repository"
+        run: gh release download ${{ github.ref_name }} -p '*.apk'
+
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v0'
+        with:
+          workload_identity_provider: 'projects/830695471992/locations/global/workloadIdentityPools/githubactions-setuptool-id-pool/providers/ga-setuptool-id-pool-provider'
+          service_account: 'githubactions-setuptool@optimum-time-233909.iam.gserviceaccount.com'
+
+      - id: 'upload-mdm-release'
+        name: "Upload MDM release"
+        uses: 'google-github-actions/upload-cloud-storage@v0'
+        with:
+          path: '.'
+          #destination: 'setup-tool-repository/testing/'
+          destination: 'setup-tool-repository/mdm/'
+          glob: "**/*.mdm-agent.*.apk"
+          parent: false
+
+      - name: "Generate latest.json"
+        run: |
+          export TMPVERSION=${{ github.ref_name }}
+          echo "{\"version\":\"${TMPVERSION:1}\"}" > latest.json
+
+      - id: 'upload-mdm-latest'
+        name: "Upload latest.json"
+        uses: 'google-github-actions/upload-cloud-storage@v0'
+        with:
+          path: '.'
+          destination: 'setup-tool-repository/mdm/'
+          #destination: 'setup-tool-repository/testing/'
+          # Never use '*.json' here !
+          # ServiceAccount credentials are in json form
+          # This get uploaded to a public repository, for now
+          glob: "latest.json"
+          parent: false

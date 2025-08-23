@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sharedprefs_filename">tech.syncvr.mdm_agent.sharedprefs</string>
+    <string name="sharedprefs_app_version">last_app_start_version</string>
+</resources>

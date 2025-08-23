@@ -1,0 +1,46 @@
+// Companion to firebase auto config, this script hooks itself as a preBuild
+// dependency to put in place default values for debug builds
+buildscript {
+}
+
+class DebugConfig extends DefaultTask {
+
+    @Internal
+    def writeIfNotExists = { path, content ->
+        def outFile = new File(new File(path).getAbsolutePath())
+        if (outFile.exists()) {
+            return
+        }
+        new File(outFile.getParent()).mkdirs()
+        println "Writing defaults : ${path}"
+        outFile << content
+    }
+
+    @Internal
+    def defaultGoogleSvc = { path, pkgName ->
+        writeIfNotExists(path,
+                new File('./config/template-goog-svc.json').text.replace('@TOKEN@', pkgName))
+    }
+
+    @Internal
+    def defaultSecret = { path ->
+        def text = """<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="syncvr_app_key">DUMMYVALUE</string>
+</resources>
+"""
+        writeIfNotExists(path, text)
+    }
+
+    @TaskAction
+    def config() {
+        // Due to the way this task is hooked in gradle, we need absolute paths here
+        def goog_dbg = "${project.rootDir}/app/src/debug/google-services.json"
+        def secret_dbg = "${project.rootDir}/app/src/debug/res/values/secrets.xml"
+
+        defaultGoogleSvc(goog_dbg, 'tech.syncvr.mdm_agent')
+        defaultSecret(secret_dbg)
+    }
+}
+
+tasks.register('debugConfig', DebugConfig)

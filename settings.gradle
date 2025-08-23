@@ -1,0 +1,9 @@
+include ':app'
+rootProject.name = "SyncVR MDM Agent"
+include ':mdm-common'
+include ':logging-connector'
+include ':device-identity-connector'
+include ':mdm-config-connector'
+include ':platform-sdk'
+include ':syncvrplatformtestapp'
+include ':logging-connector-v2'

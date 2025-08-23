@@ -1,0 +1,129 @@
+// That file should be usable as a drop-in (to be customized) an any android project using firebase
+// As long as there's a java sdk it might even be adapted to other providers or config files
+buildscript {
+    repositories {
+        mavenCentral()
+        google()
+    }
+    dependencies {
+        classpath 'com.google.firebase:firebase-admin:8.1.0'
+    }
+}
+
+
+import com.google.auth.oauth2.GoogleCredentials
+import com.google.firebase.FirebaseApp
+import com.google.firebase.FirebaseOptions
+import com.google.firebase.cloud.FirestoreClient
+import com.google.firebase.projectmanagement.FirebaseProjectManagement
+
+class FirebaseConfig extends DefaultTask {
+
+    @Internal
+    def getAdmin = { cred ->
+        def creds = GoogleCredentials.fromStream(new FileInputStream(cred))
+        def opt = FirebaseOptions.builder().setCredentials(creds).build()
+        return FirebaseApp.initializeApp(opt)
+    }
+
+    @Internal
+    def writeGoogleSvc = { admin, path, appid ->
+        println "Writing ${path}"
+        def mgmt = FirebaseProjectManagement.getInstance(admin)
+        def conf = mgmt.getAndroidApp(appid).getConfig()
+        def outFile = new File(new File(path).getAbsolutePath())
+        new File(outFile.getParent()).mkdirs()
+        outFile.delete()
+        outFile << conf
+    }
+
+    @Internal
+    def writeSecret = { path, secret ->
+        println "Writing ${path}"
+        def text = """<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="syncvr_app_key">${secret}</string>
+</resources>
+"""
+        def outFile = new File(new File(path).getAbsolutePath())
+        new File(outFile.getParent()).mkdirs()
+        outFile.delete()
+        outFile << text
+    }
+
+    @Internal
+    def writeAllGoogleSvcAndSecrets = { admin, goog_list, secrets_map ->
+        def error = null
+        try {
+            goog_list.forEach { path, appid ->
+                writeGoogleSvc(admin, path, appid)
+            }
+            secrets_map.forEach { propkey, secretpaths ->
+                def key = FirestoreClient.getFirestore()
+                        .document(project.findProperty(propkey))
+                        .get().get().getString('appKey')
+                secretpaths.forEach { secretpath ->
+                    writeSecret(secretpath, key)
+                }
+            }
+        } catch (Exception e) {
+            error = e
+        } finally {
+            admin.delete()
+        }
+        if (error != null) {
+            throw error
+        }
+    }
+
+    @TaskAction
+    def config() {
+        def checkPath = "${System.properties['user.home']}${File.separator}.syncvr"
+        println "Looking for your Firebase credentials as dev.json and prod.json in ${checkPath}"
+        println "Default gradle home ${project.gradle.gradleUserHomeDir}"
+        def prod = "${checkPath}${File.separator}prod.json"
+        def dev = "${checkPath}${File.separator}dev.json"
+        assert new File(prod).exists()
+        assert new File(dev).exists()
+
+        // Debug stuff
+        def goog_dbg = "${project.rootDir}/app/src/debug/google-services.json"
+        def secret_dbg = "${project.rootDir}/app/src/debug/res/values/secrets.xml"
+        // Staging
+        def goog_stg = "${project.rootDir}/app/src/staging/google-services.json"
+        def secret_stg = "${project.rootDir}/app/src/staging/res/values/secrets.xml"
+        // Profiler
+        def goog_prof = "${project.rootDir}/app/src/profiler/google-services.json"
+        def secret_prof = "${project.rootDir}/app/src/profiler/res/values/secrets.xml"
+        // StagingRelease
+        def goog_staging_rel = "${project.rootDir}/app/src/stagingRelease/google-services.json"
+        // Mock
+        def goog_mock = "${project.rootDir}/app/src/mock/google-services.json"
+        def secret_mock = "${project.rootDir}/app/src/mock/res/values/secrets.xml"
+
+        // Do not oversimplify properties name. Those properties can (and will) end up
+        // in a gradle.properties file that is global to all project.
+        // 'appid_dbg' in gradle.properties could be confusing
+        // 'appid_mdm_dbg' is more specific and has less chance to be already used
+        def appid_dbg = project.findProperty('appid_mdm_dbg')
+
+        writeAllGoogleSvcAndSecrets(getAdmin(dev),
+                [[goog_stg, appid_dbg],[goog_staging_rel, appid_dbg],[goog_prof, appid_dbg], [goog_mock, appid_dbg]],
+                [db_mdm_dbg: []])
+
+        // Release stuff
+        def goog_rel = "${project.rootDir}/app/src/release/google-services.json"
+        def secret_rel = "${project.rootDir}/app/src/release/res/values/secrets.xml"
+        // StagingRelease
+        def secret_staging_rel = "${project.rootDir}/app/src/stagingRelease/res/values/secrets.xml"
+
+        def appid_rel = project.findProperty('appid_mdm_rel')
+
+        writeAllGoogleSvcAndSecrets(getAdmin(prod),
+                [[goog_rel, appid_rel],[goog_dbg, appid_rel]],
+                [db_mdm_rel: [secret_rel, secret_dbg, secret_prof, secret_stg, secret_staging_rel, secret_mock]])
+    }
+}
+
+tasks.register('firebase', FirebaseConfig)
+
