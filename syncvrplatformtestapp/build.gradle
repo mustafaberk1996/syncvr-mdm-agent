@@ -18,7 +18,7 @@ android {
         applicationId "tech.syncvr.syncvrplatformtestapp"
         minSdk 27
         targetSdk 33
-        versionCode androidGitVersion.code()
+        versionCode androidGitVersion.code().or(1)
         versionName androidGitVersion.name()
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
