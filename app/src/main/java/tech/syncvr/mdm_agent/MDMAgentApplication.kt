@@ -2,6 +2,7 @@ package tech.syncvr.mdm_agent
 
 import android.Manifest.permission.BLUETOOTH_CONNECT
 import android.Manifest.permission.PACKAGE_USAGE_STATS
+import android.Manifest.permission.READ_EXTERNAL_STORAGE
 import android.Manifest.permission.READ_PHONE_STATE
 import android.annotation.SuppressLint
 import android.app.Application
@@ -44,7 +45,7 @@ import tech.syncvr.mdm_agent.device_management.system_settings.ISystemSettingsSe
 import tech.syncvr.mdm_agent.disk_space.DiskSpaceUtil.getAvailableDiskSpace
 import tech.syncvr.mdm_agent.firebase.IAuthenticationService
 import tech.syncvr.mdm_agent.logging.AnalyticsLogger
-import tech.syncvr.mdm_agent.logging.UploadLogEntriesWorker
+import tech.syncvr.mdm_agent.policy.PolicyBroadcastScheduler
 import tech.syncvr.mdm_agent.receivers.DeviceOwnerReceiver
 import tech.syncvr.mdm_agent.receivers.PackageInstallerSessionStatusReceiver
 import tech.syncvr.mdm_agent.repositories.DeviceInfoRepository
@@ -118,6 +119,9 @@ class MDMAgentApplication : Application(), Configuration.Provider {
 
     @Inject
     lateinit var appInstallService: AppInstallService
+
+    @Inject
+    lateinit var policyBroadcastScheduler: PolicyBroadcastScheduler
 
     // https://developer.android.com/training/dependency-injection/hilt-jetpack#workmanager
 
@@ -276,6 +280,15 @@ class MDMAgentApplication : Application(), Configuration.Provider {
         )
         Log.d(TAG, "Serial permission grant result $canGetSerial")
 
+        // Grant READ_EXTERNAL_STORAGE for policy file access
+        val canReadExternalStorage = devicePolicyManager.setPermissionGrantState(
+            deviceOwnerComponent,
+            packageName,
+            READ_EXTERNAL_STORAGE,
+            PERMISSION_GRANT_STATE_GRANTED
+        )
+        Log.d(TAG, "READ_EXTERNAL_STORAGE permission grant result $canReadExternalStorage")
+
         if (PermissionChecker.checkSelfPermission(this, PACKAGE_USAGE_STATS)
             != PermissionChecker.PERMISSION_GRANTED
         ) {
@@ -386,6 +399,7 @@ class MDMAgentApplication : Application(), Configuration.Provider {
         schedulePeriodicGetDefaultApps(policy)
         schedulePeriodicSetBluetoothName(policy)
         schedulePeriodicFirmwareUpgradeCheck(policy)
+        policyBroadcastScheduler.schedulePolicyBroadcast()
     }
 
     private fun schedulePeriodicFirmwareUpgradeCheck(policy: ExistingPeriodicWorkPolicy) {
